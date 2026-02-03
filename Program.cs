@@ -1,4 +1,11 @@
+using Microsoft.EntityFrameworkCore;
+using job_tracker_api.Data;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Register PostgreSQL
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add services to the container.
 builder.Services.AddControllers();
