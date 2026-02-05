@@ -18,10 +18,20 @@ namespace job_tracker_api.Controllers
 
         // GET: api/jobapplications
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<JobApplication>>> GetJobApplications()
+        public async Task<ActionResult<IEnumerable<JobApplication>>> GetJobApplications([FromQuery] string? status)
         {
-            return await _context.JobApplications.ToListAsync();
+            if (string.IsNullOrEmpty(status))
+            {
+                // No filter - return all
+                return await _context.JobApplications.ToListAsync();
+            }
+            
+            // Filter by status
+            return await _context.JobApplications
+                .Where(j => j.Status == status)
+                .ToListAsync();
         }
+
 
         // GET: api/jobapplications/5
         [HttpGet("{id}")]
@@ -89,6 +99,36 @@ namespace job_tracker_api.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        [HttpGet("weekly-progress")]
+        public async Task<ActionResult<object>> GetWeeklyProgress()
+        {
+            // Get start of current week (Monday)
+            var today = DateTime.UtcNow.Date;
+            var daysSinceMonday = (int)today.DayOfWeek - (int)DayOfWeek.Monday;
+            if (daysSinceMonday < 0) daysSinceMonday += 7; // Handle Sunday
+            
+            var weekStart = today.AddDays(-daysSinceMonday);
+            var weekEnd = weekStart.AddDays(7);
+            
+            // Count applications added this week
+            var applicationsThisWeek = await _context.JobApplications
+                .Where(j => j.CreatedAt >= weekStart && j.CreatedAt < weekEnd)
+                .CountAsync();
+            
+            var goal = 2;
+            var isComplete = applicationsThisWeek >= goal;
+            
+            return Ok(new
+            {
+                applicationsThisWeek,
+                goal,
+                isComplete,
+                weekStart = weekStart.ToString("yyyy-MM-dd"),
+                weekEnd = weekEnd.AddDays(-1).ToString("yyyy-MM-dd"),
+                remaining = Math.Max(0, goal - applicationsThisWeek)
+            });
         }
 
         private bool JobApplicationExists(int id)
